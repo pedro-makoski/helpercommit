@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -27,13 +28,13 @@ type Args struct{
 	Files string 
 }
 
-func Init() error {
-	_, err := os.Stat(PATH_JSON)
+func Init(path string) error {
+	_, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err := os.WriteFile(PATH_JSON, []byte("[]"), 0755)
+			err := os.WriteFile(path, []byte("[]"), 0755)
 			if err != nil {
-				return errors.New("Erro ao escrever o arquivo")
+				return errors.New("erro ao escrever o arquivo")
 			}
 		}
 	}
@@ -41,7 +42,7 @@ func Init() error {
 	return nil 
 }
 
-func create(args []string) {
+func create(args []string, pathJson string) {
 	if len(args) < QUANT_MIN_ARGS_NEW {
 		fmt.Println("Não passado argumentos suficientes")
 		return 
@@ -50,13 +51,13 @@ func create(args []string) {
 	id := args[1]
 	path := args[2]
 
-	err := NewCDCommand(path, id, PATH_JSON)
+	err := NewCDCommand(path, id, pathJson)
 	if err == nil {
 		fmt.Println("Criado com sucesso!!!")
 	}
 }
 
-func doCommit(args []string, description string, files string, branch string) {
+func doCommit(args []string, description string, files string, branch string, pathJson string) {
 	if len(args) < QUANT_MIN_ARGS_DO {
 		fmt.Println("Não passado argumentos suficientes")
 		return 
@@ -73,7 +74,7 @@ func doCommit(args []string, description string, files string, branch string) {
 		Branch: branch,
 	}
 
-	err := data.RealizeFile()
+	err := data.RealizeFile(pathJson)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -82,14 +83,14 @@ func doCommit(args []string, description string, files string, branch string) {
 	fmt.Println("Comitado com sucesso!!!")
 }
 
-func doPull(args []string) {
+func doPull(args []string, pathAbs string) {
 	if len(args) < QUANT_MIN_PULL {
 		fmt.Println("Não passado argumentos suficientes")
 		return 
 	}
 
 	id := args[1]
-	path, err := SearchDirectory(id, PATH_JSON, NAME_KEY, DIR_KEY)
+	path, err := SearchDirectory(id, pathAbs, NAME_KEY, DIR_KEY)
 	if err != nil {
 		return
 	}
@@ -100,8 +101,25 @@ func doPull(args []string) {
 	fmt.Println("Feito o pull")
 }
 
+func getBasePath(pathLocal string) (string, error){
+	exePath, err := os.Executable()
+	if err != nil {
+		err = errors.New("erro ao obter o caminho do executável")
+		fmt.Println(err.Error())
+		return "", err 
+	}
+
+	exeDir := filepath.Dir(exePath)
+	return filepath.Join(exeDir, pathLocal), nil 
+}
+
 func main() {
-	err := Init()
+	pathAbs, err := getBasePath(PATH_JSON)
+	if err != nil {
+		return 
+	}
+
+	err = Init(pathAbs)
 	if err != nil {
 		return 
 	}
@@ -120,18 +138,18 @@ func main() {
 	whatIDo := args[0]
 	switch(whatIDo) {
 	case CREATE_IDENTIFIER:
-		create(args)
+		create(args, pathAbs)
 	case COMMIT_IDENTIFIER:
-		doCommit(args, *description, *files, *branch)
+		doCommit(args, *description, *files, *branch, pathAbs)
 	case PULL_IDENTIFIER:
-		doPull(args)
+		doPull(args, pathAbs)
 	default:
 		fmt.Println("O comando não existe")
 	}
 }
 
-func (obj Args) RealizeFile() error{
-	path, err := SearchDirectory(obj.Name, PATH_JSON, NAME_KEY, DIR_KEY)
+func (obj Args) RealizeFile(pathJson string) error{
+	path, err := SearchDirectory(obj.Name, pathJson, NAME_KEY, DIR_KEY)
 	if err != nil {
 		return err 
 	}
